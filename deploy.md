@@ -142,6 +142,23 @@ git push origin main
 → Render detects the push, pulls the latest commit, rebuilds the image,
 and redeploys. You can watch each deploy in the **Deploys** tab.
 
+### Verify the GitHub webhook actually got installed
+
+Render's auto-deploy depends on a webhook GitHub fires on every push.
+The Blueprint setup *should* install this webhook automatically — but
+on some accounts (especially organization repos with restricted GitHub
+App permissions) it silently fails to install, and pushes then don't
+trigger anything.
+
+To verify:
+
+1. Open `https://github.com/<your-username>/<your-repo>/settings/hooks`
+2. You should see **one** webhook with:
+   - **Payload URL**: `https://api.render.com/deploy/srv-<your-service-id>?key=...`
+   - A green ✓ on **Recent Deliveries** (most recent should be a successful 200)
+3. If there's no webhook, or the most recent delivery shows red ✗, see
+   [Troubleshooting → Auto-deploy isn't firing](#auto-deploy-isnt-firing-after-git-push).
+
 ---
 
 ## After deploy
@@ -219,6 +236,65 @@ plan. If you hit it, either:
 ---
 
 ## Troubleshooting
+
+### Auto-deploy isn't firing after `git push`
+
+Symptom: you push to `main`, but Render's **Events** tab shows nothing
+new. Auto-Deploy is set to "On Commit" in Render's Settings, but
+nothing happens.
+
+This means GitHub isn't telling Render about your pushes — the webhook
+that bridges them is either missing or broken. Two ways to fix:
+
+#### Option A — Re-link GitHub (cleanest)
+
+In Render dashboard → service → **Settings** → scroll to **GitHub**
+section:
+
+1. Click **Disconnect** and confirm
+2. Click **Connect** and re-authorize Render's GitHub access
+3. Pick the repo again — this reinstalls the webhook with full payload
+   signing
+
+Future pushes should auto-deploy normally. If your repo is in a
+GitHub Organization with restricted app permissions, an org admin may
+need to approve the Render GitHub App first
+(`https://github.com/organizations/<org>/settings/installations`).
+
+#### Option B — Add a webhook manually using the Deploy Hook
+
+When Option A doesn't work (or the org won't grant the Render app
+broader access), install the webhook yourself using Render's
+**Deploy Hook** URL — a private URL that triggers a deploy on any POST.
+
+1. In Render → **Settings** → **Build & Deploy** section → find
+   **Deploy Hook** at the bottom → click the eye icon to reveal,
+   then copy the URL. It looks like:
+   `https://api.render.com/deploy/srv-XXXXX?key=YYYYY`
+2. On GitHub: open `https://github.com/<you>/<repo>/settings/hooks`
+3. Click **Add webhook**
+4. Fill in:
+
+   | Field | Value |
+   |---|---|
+   | Payload URL | the Deploy Hook URL from step 1 |
+   | Content type | `application/x-www-form-urlencoded` *(Render ignores the body — any content type works)* |
+   | Secret | leave empty *(the `?key=` already authenticates)* |
+   | SSL verification | Enable |
+   | Which events | **Just the `push` event** |
+   | Active | ✓ checked |
+
+5. Click **Add webhook**
+
+GitHub immediately fires a `ping` to test the URL, which Render treats
+as a deploy trigger. You should see "First deploy started" in Render's
+Events tab within ~30 seconds. Every future `git push` does the same.
+
+> ⚠️ **The Deploy Hook URL is a secret.** It contains a key that lets
+> anyone trigger a deploy of your service. Don't paste it in chat,
+> screenshots, gists, or commits. If you ever leak it: Render →
+> **Settings** → **Build & Deploy** → **Deploy Hook** →
+> **Regenerate hook**, then update the GitHub webhook with the new URL.
 
 ### Build fails partway through `apt-get install`
 
