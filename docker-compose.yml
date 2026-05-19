@@ -1,0 +1,34 @@
+# docker compose up -d              # build (first time) + start on http://localhost:8080
+# docker compose up -d --build      # force rebuild after Dockerfile changes
+# docker compose down               # stop and remove the container
+#
+# Source files are BIND-MOUNTED from the host into the container, so
+# edits to index.php / includes/*.php / api/*.php / assets/* are visible
+# on the next browser refresh — no restart, no rebuild. Only Dockerfile
+# changes or apt-package changes require `./bin/rebuild`.
+#
+# For a production-style deploy (self-contained image, no bind-mount),
+# either build & run with `docker run` directly against the image, or
+# create a separate docker-compose.prod.yml that omits the volumes block.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: md-to-pdf-converter:local
+    container_name: md-to-pdf-converter
+    ports:
+      - "8080:80"
+    environment:
+      # The app's includes/env.php prefers real env vars over the .env file,
+      # so these win at runtime without needing .env baked into the image.
+      FONT_SOURCE: ${FONT_SOURCE:-google}
+      GOOGLE_FONTS_API_KEY: ${GOOGLE_FONTS_API_KEY:-}
+    volumes:
+      # Project source mounted live — PHP/JS/CSS edits are picked up immediately
+      - ./:/var/www/html
+      # Anonymous volume keeps the container's tmp/ separate from the host's,
+      # so Chrome's per-job profile cache doesn't pollute your working copy.
+      - /var/www/html/tmp
+    restart: unless-stopped

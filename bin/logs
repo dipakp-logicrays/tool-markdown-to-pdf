@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#
+# Tail the container's combined stdout+stderr (Apache access + error log
+# both go here in php:apache base). Ctrl-C to exit.
+#
+# Usage:
+#   ./bin/logs
+
+set -euo pipefail
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
+. "$PROJECT_DIR/bin/_common"
+require_docker
+
+exec docker compose logs -f --tail=50

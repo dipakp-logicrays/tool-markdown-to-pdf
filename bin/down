@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#
+# Stop and remove the converter container. Image is preserved so the next
+# `./bin/up` is fast. To also wipe the image, append `--rmi all`.
+#
+# Usage:
+#   ./bin/down
+#   ./bin/down --rmi all
+
+set -euo pipefail
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
+. "$PROJECT_DIR/bin/_common"
+require_docker
+
+docker compose down "$@"

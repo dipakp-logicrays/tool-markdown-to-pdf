@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#
+# Run bin/health_check INSIDE the running container.
+#
+# This is the right way to check the deployed environment: it tests
+# pandoc, chromium, fontconfig, and project files as they are inside
+# the container, not on the host. For a host check (no Docker), run
+# ./bin/health_check directly.
+#
+# Usage:
+#   ./bin/health
+
+set -euo pipefail
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
+. "$PROJECT_DIR/bin/_common"
+require_docker
+
+if ! docker compose ps --status running --services 2>/dev/null | grep -q '^app$'; then
+    echo "Container is not running. Start it with ./bin/up first." >&2
+    exit 1
+fi
+
+exec docker compose exec -T app /var/www/html/bin/health_check "$@"

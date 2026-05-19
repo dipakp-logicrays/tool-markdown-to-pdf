@@ -26,8 +26,12 @@ function runChrome(string $htmlPath, string $pdfPath, string $jobDir): void
     // --virtual-time-budget gives Chrome up to 5s of virtual time to settle
     // network and rendering, which is what makes web-font fetches (Google Fonts)
     // complete before the PDF is snapshotted.
+    //
+    // --disable-dev-shm-usage forces Chrome to use /tmp instead of /dev/shm.
+    // Docker's default /dev/shm is 64 MB which Chrome will exhaust on
+    // larger documents; harmless outside containers.
     $cmd = sprintf(
-        '%s --headless --disable-gpu --no-sandbox --hide-scrollbars '
+        '%s --headless --disable-gpu --no-sandbox --disable-dev-shm-usage --hide-scrollbars '
         . '--no-pdf-header-footer --user-data-dir=%s '
         . '--virtual-time-budget=5000 '
         . '--print-to-pdf=%s %s 2>&1',

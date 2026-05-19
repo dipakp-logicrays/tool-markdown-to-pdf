@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+#
+# Rebuild the image and recreate the container.
+# Use after changes to Dockerfile, source files, or .env.
+#
+# Usage:
+#   ./bin/rebuild
+
+set -euo pipefail
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
+. "$PROJECT_DIR/bin/_common"
+require_docker
+
+echo "Rebuilding image..."
+docker compose build
+echo
+echo "Recreating container..."
+docker compose up -d --force-recreate
+
+PORT=$(docker compose port app 80 2>/dev/null | awk -F: '{print $NF}')
+echo
+echo "Ready at: http://localhost:${PORT:-8080}"

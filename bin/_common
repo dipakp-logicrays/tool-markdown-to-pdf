@@ -1,0 +1,40 @@
+# Shared helpers for the bin/* Docker wrapper scripts. SOURCED, not executed.
+# Usage:
+#   . "$PROJECT_DIR/bin/_common"
+#   require_docker
+
+# ANSI colors (no-op if not a TTY)
+if [ -t 2 ]; then
+    _C_RED='\033[0;31m'; _C_YELLOW='\033[0;33m'; _C_DIM='\033[2m'; _C_RESET='\033[0m'
+else
+    _C_RED=''; _C_YELLOW=''; _C_DIM=''; _C_RESET=''
+fi
+
+# Verify docker is installed AND the daemon is reachable AND compose v2 is
+# available. Prints a clear, actionable message and exits 1 on any failure.
+require_docker() {
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${_C_RED}✗${_C_RESET} Docker is not installed." >&2
+        echo "  Install Docker Engine 20.10+ from https://docs.docker.com/engine/install/" >&2
+        exit 1
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        echo -e "${_C_RED}✗${_C_RESET} Docker daemon is not running." >&2
+        echo "  Start it with one of:" >&2
+        echo "    ${_C_YELLOW}sudo systemctl start docker${_C_RESET}     (Linux with systemd)" >&2
+        echo "    ${_C_YELLOW}sudo service docker start${_C_RESET}        (other Linux)" >&2
+        echo "    open Docker Desktop                                   (macOS / Windows)" >&2
+        echo "" >&2
+        echo -e "  ${_C_DIM}Then re-run this command.${_C_RESET}" >&2
+        exit 1
+    fi
+
+    if ! docker compose version >/dev/null 2>&1; then
+        echo -e "${_C_RED}✗${_C_RESET} Docker Compose v2 is not available." >&2
+        echo "  Modern Docker installs include the 'docker compose' plugin." >&2
+        echo "  Install / update: https://docs.docker.com/compose/install/" >&2
+        echo -e "  ${_C_DIM}Note: the legacy 'docker-compose' (with hyphen) is unsupported.${_C_RESET}" >&2
+        exit 1
+    fi
+}

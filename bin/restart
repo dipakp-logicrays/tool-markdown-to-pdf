@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#
+# Restart the converter container without rebuilding the image.
+# Use ./bin/rebuild instead if Dockerfile or source files have changed.
+#
+# Usage:
+#   ./bin/restart
+
+set -euo pipefail
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
+. "$PROJECT_DIR/bin/_common"
+require_docker
+
+docker compose restart

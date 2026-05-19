@@ -1,0 +1,23 @@
+# Don't ship secrets or per-host state inside the image.
+.env
+.env.local
+
+# Per-job working dirs are created at runtime
+tmp/
+!tmp/.gitkeep
+
+# Git / dev / editor noise
+.git
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+*.log
+
+# Docs and CI/dev assets aren't needed in the image
+docs/
+.github/

@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+#
+# Clean stale tmp/job_* directories.
+#
+# Each conversion creates a working directory at tmp/job_<random>/ and
+# cleans it up automatically when the request finishes. If a request is
+# killed mid-flight (browser closed, Apache crash, OOM, etc.) the dir is
+# left behind. This script sweeps them up.
+#
+# Safety: by default only deletes directories OLDER than 5 minutes so
+# in-flight conversions are never touched. Pass --age 0 to wipe
+# everything unconditionally (caution: may break a running conversion).
+#
+# Works in both setups:
+#   * Native install — cleans the host's tmp/ directly.
+#   * Docker — also cleans the container's /var/www/html/tmp/ (a docker
+#     anonymous volume, separate from the host's tmp/).
+#   * Both: cleans whichever exists and is reachable.
+#
+# Usage:
+#   ./bin/clean_tmp                  # remove job_* older than 5 minutes
+#   ./bin/clean_tmp --age 60         # older than 60 minutes
+#   ./bin/clean_tmp --age 0          # everything, regardless of age
+#   ./bin/clean_tmp --dry-run        # show what would be deleted
+#   ./bin/clean_tmp --quiet          # silent mode (cron-friendly)
+
+set -euo pipefail
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
+
+AGE_MIN=5
+QUIET=0
+DRY_RUN=0
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --age)        AGE_MIN="$2"; shift 2 ;;
+        --quiet)      QUIET=1; shift ;;
+        --dry-run|-n) DRY_RUN=1; shift ;;
+        -h|--help)
+            # Print the leading comment block (everything after the shebang
+            # and before the first non-comment line), stripping the "# " prefix.
+            awk 'NR==1 { next }
+                 /^#/  { print substr($0, 3); next }
+                       { exit }' "$0"
+            exit 0 ;;
+        *) echo "Unknown option: $1" >&2; exit 2 ;;
+    esac
+done
+
+# ANSI colors when running on a TTY
+if [ -t 1 ] && [ "$QUIET" -eq 0 ]; then
+    GREEN='\033[0;32m'; DIM='\033[2m'; RESET='\033[0m'
+else
+    GREEN=''; DIM=''; RESET=''
+fi
+
+log()     { if [ "$QUIET" -eq 0 ]; then echo -e "$@"; fi; }
+section() { if [ "$QUIET" -eq 0 ]; then echo -e "\n${DIM}— $1${RESET}"; fi; }
+
+# -mmin is omitted entirely when AGE_MIN=0 so find matches all job_* dirs
+AGE_ARGS=()
+[ "$AGE_MIN" -gt 0 ] && AGE_ARGS=(-mmin "+$AGE_MIN")
+
+# ---------------------------------------------------------------------
+# Host: PROJECT_DIR/tmp/job_*
+# ---------------------------------------------------------------------
+section "Host tmp/"
+HOST_TMP="$PROJECT_DIR/tmp"
+
+if [ -d "$HOST_TMP" ]; then
+    mapfile -t HITS < <(
+        find "$HOST_TMP" -maxdepth 1 -name 'job_*' -type d "${AGE_ARGS[@]}" -print 2>/dev/null \
+        || true
+    )
+    if [ "${#HITS[@]}" -eq 0 ]; then
+        log "  ${DIM}nothing to clean${RESET}"
+    elif [ "$DRY_RUN" -eq 1 ]; then
+        log "  ${#HITS[@]} dir(s) would be removed:"
+        printf '    %s\n' "${HITS[@]}"
+    else
+        for d in "${HITS[@]}"; do rm -rf -- "$d"; done
+        log "  ${GREEN}${#HITS[@]}${RESET} dir(s) removed"
+    fi
+else
+    log "  ${DIM}$HOST_TMP does not exist — skipping${RESET}"
+fi
+
+# ---------------------------------------------------------------------
+# Container: /var/www/html/tmp/job_* (if running)
+# ---------------------------------------------------------------------
+if command -v docker >/dev/null 2>&1 \
+    && docker compose ps --status running --services 2>/dev/null | grep -q '^app$'; then
+
+    section "Container tmp/ (md-to-pdf-converter)"
+
+    # Build the find expression as a single shell string so we can
+    # interpolate the optional -mmin clause.
+    FIND_AGE=""
+    [ "$AGE_MIN" -gt 0 ] && FIND_AGE="-mmin +$AGE_MIN"
+
+    LIST_CMD="find /var/www/html/tmp -maxdepth 1 -name 'job_*' -type d $FIND_AGE 2>/dev/null"
+    RM_CMD="$LIST_CMD -exec rm -rf {} + 2>/dev/null"
+
+    list=$(docker compose exec -T app sh -c "$LIST_CMD" 2>/dev/null || true)
+    count=$(printf '%s\n' "$list" | grep -c '^/' || true)
+
+    if [ "$count" -eq 0 ]; then
+        log "  ${DIM}nothing to clean${RESET}"
+    elif [ "$DRY_RUN" -eq 1 ]; then
+        log "  $count dir(s) would be removed:"
+        printf '%s\n' "$list" | sed 's/^/    /'
+    else
+        docker compose exec -T app sh -c "$RM_CMD" 2>/dev/null || true
+        log "  ${GREEN}${count}${RESET} dir(s) removed"
+    fi
+else
+    if command -v docker >/dev/null 2>&1; then
+        section "Container tmp/"
+        log "  ${DIM}container not running — skipping${RESET}"
+    fi
+fi
+
+log ""
+log "${GREEN}OK${RESET}"

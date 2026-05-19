@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+#
+# Open an interactive bash shell inside the running container.
+# Useful for poking around the filesystem, running manual pandoc/chromium
+# commands, or running bin/health_check from inside the container.
+#
+# Usage:
+#   ./bin/shell
+
+set -euo pipefail
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
+. "$PROJECT_DIR/bin/_common"
+require_docker
+
+exec docker compose exec app bash

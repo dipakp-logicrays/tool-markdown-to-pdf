@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+#
+# Start the converter in Docker (detached). Builds the image on first run.
+#
+# Usage:
+#   ./bin/up
+
+set -euo pipefail
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_DIR"
+. "$PROJECT_DIR/bin/_common"
+require_docker
+
+echo "Starting container..."
+docker compose up -d
+
+PORT=$(docker compose port app 80 2>/dev/null | awk -F: '{print $NF}')
+URL="http://localhost:${PORT:-8080}"
+echo
+echo "Ready at: $URL"
+echo "Tail logs: ./bin/logs"
+echo "Stop:      ./bin/down"
