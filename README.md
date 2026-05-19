@@ -54,6 +54,15 @@ See [docs/features.md](docs/features.md) for the full feature breakdown.
 
 ---
 
+## Deploy to the public web
+
+The repo ships with a [Render Blueprint](render.yaml). Push to GitHub,
+connect the repo to [Render.com](https://render.com), and every push
+auto-deploys to a free `*.onrender.com` URL. Full walkthrough:
+[docs/deployment.md](docs/deployment.md).
+
+---
+
 ## Documentation
 
 | Document | What's in it |
@@ -62,6 +71,7 @@ See [docs/features.md](docs/features.md) for the full feature breakdown.
 | [docs/usage.md](docs/usage.md) | How to use the form, output format, the `bin/` Docker wrappers, programmatic use via `curl`. |
 | [docs/features.md](docs/features.md) | Deep dive: conversion pipeline, AJAX flow, font picker internals (lazy preview loading, server-streamed system fonts), print CSS, health check. |
 | [docs/configuration.md](docs/configuration.md) | `includes/config.php` defaults, `.env` variables (`FONT_SOURCE`, `GOOGLE_FONTS_API_KEY`), per-request form options, customizing the print CSS. |
+| [docs/deployment.md](docs/deployment.md) | Deploying to Render.com via the bundled Blueprint with auto-deploy on `git push`. Notes on free-tier limits and alternative PaaS options. |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Common issues: Pandoc / Chrome failures, fonts not previewing, permissions, slow conversions, Docker container won't start. |
 
 ---

@@ -1,0 +1,26 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# This file lets Render auto-detect the deployment shape from the repo.
+# Connect the repo to Render once and every push to the default branch
+# triggers a rebuild + redeploy.
+#
+# See docs/deployment.md for the step-by-step setup walkthrough.
+
+services:
+  - type: web
+    name: md-to-pdf-converter
+    runtime: docker
+    plan: free                  # 512 MB RAM, sleeps after 15 min idle
+    region: oregon              # free-tier regions: oregon, singapore, frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    autoDeploy: true            # redeploy on every push to the default branch
+    envVars:
+      - key: FONT_SOURCE
+        value: google
+      - key: GOOGLE_FONTS_API_KEY
+        # sync: false means Render does NOT read this from the blueprint —
+        # you set the actual value in the Render dashboard once. Safe for
+        # API keys that shouldn't live in git.
+        sync: false

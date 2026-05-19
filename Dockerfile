@@ -61,11 +61,16 @@ RUN mkdir -p /var/www/html/tmp \
 RUN mkdir -p /var/www/.cache/fontconfig \
     && chown -R www-data:www-data /var/www
 
+# Entrypoint adjusts Apache to listen on $PORT (Render sets this; default 80
+# locally for docker compose / docker run).
+COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENV PORT=80
 EXPOSE 80
 
-# php:apache's default CMD already starts Apache in the foreground; no need
-# to override unless you want a different entrypoint.
+CMD ["docker-entrypoint.sh"]
 
-# Basic healthcheck — pings the form endpoint
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -fsS http://localhost/ > /dev/null || exit 1
+# Healthcheck pings the form endpoint on whatever port Apache is bound to.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -fsS "http://localhost:${PORT:-80}/" > /dev/null || exit 1
