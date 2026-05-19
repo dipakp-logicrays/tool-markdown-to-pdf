@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+#
+# Re-fetch the Google Fonts catalog and rebuild the bundled JSON.
+#
+# Source: Google Fonts Developer API
+#   https://developers.google.com/fonts/docs/developer_api
+#
+# Requires a Google Fonts Developer API key. The script reads it from
+# the project's .env file (preferred) or from the GOOGLE_FONTS_API_KEY
+# environment variable.
+#
+# Output: assets/data/google_fonts.json — sorted by popularity, italics
+# stripped, with only upright-weight numbers per family.
+#
+# Usage:
+#   ./bin/refresh_fonts
+#   GOOGLE_FONTS_API_KEY=xxx ./bin/refresh_fonts
+
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+DEST="$PROJECT_DIR/assets/data/google_fonts.json"
+ENV_FILE="$PROJECT_DIR/.env"
+TMP=$(mktemp)
+trap 'rm -f "$TMP"' EXIT
+
+# Load API key from .env if present (without leaking other env vars)
+if [ -z "${GOOGLE_FONTS_API_KEY:-}" ] && [ -f "$ENV_FILE" ]; then
+    # shellcheck disable=SC1090
+    set -a
+    # Only source the relevant line so we don't accidentally evaluate
+    # arbitrary shell from .env.
+    GOOGLE_FONTS_API_KEY=$(grep -E '^GOOGLE_FONTS_API_KEY=' "$ENV_FILE" | head -1 | cut -d= -f2-)
+    set +a
+fi
+
+if [ -z "${GOOGLE_FONTS_API_KEY:-}" ]; then
+    echo "ERROR: GOOGLE_FONTS_API_KEY is not set." >&2
+    echo "       Add it to $ENV_FILE (see .env.example) or export it." >&2
+    exit 1
+fi
+
+URL="https://www.googleapis.com/webfonts/v1/webfonts?key=${GOOGLE_FONTS_API_KEY}&sort=popularity"
+
+echo "Fetching Google Fonts catalog from Google Fonts Developer API..."
+HTTP_CODE=$(curl -fsS --max-time 30 "$URL" -o "$TMP" -w "%{http_code}" || echo "000")
+if [ "$HTTP_CODE" != "200" ]; then
+    echo "ERROR: Google Fonts API returned HTTP $HTTP_CODE." >&2
+    echo "       Check your API key and that the Web Fonts Developer API is enabled." >&2
+    cat "$TMP" >&2 || true
+    exit 1
+fi
+echo "  $(wc -c < "$TMP") bytes downloaded."
+
+echo "Processing into bundled JSON..."
+php <<PHP
+<?php
+\$raw = json_decode(file_get_contents("$TMP"), true);
+if (!is_array(\$raw) || !isset(\$raw["items"])) {
+    fwrite(STDERR, "Failed to parse upstream response\n");
+    exit(1);
+}
+\$out = [];
+foreach (\$raw["items"] as \$f) {
+    \$weights = [];
+    foreach ((\$f["variants"] ?? []) as \$v) {
+        if (strpos(\$v, "italic") !== false) continue;
+        \$w = (\$v === "regular") ? 400 : (int) \$v;
+        if (\$w > 0) \$weights[] = \$w;
+    }
+    \$weights = array_values(array_unique(\$weights));
+    sort(\$weights);
+    if (empty(\$weights)) \$weights = [400];
+    \$out[] = [
+        "family"   => \$f["family"],
+        "category" => \$f["category"] ?? "sans-serif",
+        "weights"  => \$weights,
+    ];
+}
+// API already returns items sorted by popularity (we passed sort=popularity),
+// so we don't re-sort here.
+file_put_contents("$DEST", json_encode(\$out, JSON_UNESCAPED_UNICODE));
+echo "Wrote " . count(\$out) . " fonts to $DEST\n";
+echo "  size: " . number_format(filesize("$DEST") / 1024, 1) . " KB\n";
+PHP

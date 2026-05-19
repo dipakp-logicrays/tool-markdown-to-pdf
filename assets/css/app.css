@@ -1,0 +1,183 @@
+/* ------------------------------------------------------------------
+ * App styles
+ * Custom Select2 overrides to match Tailwind's form input look,
+ * plus a few utility tweaks for the dropzone and loader.
+ * ------------------------------------------------------------------ */
+
+/* Select2 — match Tailwind input height, border, focus ring */
+.select2-container .select2-selection--single {
+    height: 38px !important;
+    padding: 4px 6px !important;
+    border: 1px solid #d1d5db !important;       /* gray-300 */
+    border-radius: 0.375rem !important;          /* rounded-md */
+    background-color: #ffffff !important;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 28px !important;
+    padding-left: 6px !important;
+    color: #111827 !important;                   /* gray-900 */
+    font-size: 0.875rem;                          /* sm:text-sm */
+}
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 36px !important;
+}
+.select2-container--open .select2-selection--single,
+.select2-container--focus .select2-selection--single,
+.select2-container .select2-selection--single:focus {
+    border-color: #6366f1 !important;            /* indigo-500 */
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25) !important;
+    outline: none !important;
+}
+
+/* Search box inside the open dropdown */
+.select2-search--dropdown .select2-search__field {
+    border: 1px solid #d1d5db !important;
+    border-radius: 0.375rem !important;
+    padding: 6px 10px !important;
+    font-size: 0.875rem !important;
+}
+.select2-search--dropdown .select2-search__field:focus {
+    outline: none !important;
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25) !important;
+}
+
+/* Dropdown panel */
+.select2-dropdown {
+    border-color: #d1d5db !important;
+    border-radius: 0.375rem !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+}
+.select2-results__option {
+    padding: 6px 12px !important;
+    font-size: 0.875rem !important;
+}
+.select2-container--default .select2-results__option--highlighted[aria-selected] {
+    background-color: #4f46e5 !important;        /* indigo-600 */
+    color: #ffffff !important;
+}
+/* "More fonts…" uses indigo-600 text by default; force it (and its icon)
+ * to white on hover/highlight so it's legible against the indigo bg. */
+.select2-container--default .select2-results__option--highlighted[aria-selected] .text-indigo-600,
+.select2-container--default .select2-results__option--highlighted[aria-selected] .text-indigo-600 svg {
+    color: #ffffff !important;
+}
+
+/* Dropzone — drag-active highlight */
+#dropzone.is-dragover {
+    border-color: #4f46e5;
+    background-color: #eef2ff;                   /* indigo-50 */
+}
+
+/* Inline alert variants (Tailwind utility classes are toggled in JS) */
+.alert-error {
+    background-color: #fef2f2;                   /* red-50 */
+    border: 1px solid #fecaca;                   /* red-200 */
+    color: #991b1b;                              /* red-800 */
+}
+.alert-success {
+    background-color: #f0fdf4;                   /* green-50 */
+    border: 1px solid #bbf7d0;                   /* green-200 */
+    color: #166534;                              /* green-800 */
+}
+
+/* ------------------------------------------------------------------
+ * Fonts modal — Google Docs-style font browser with infinite scroll
+ * ------------------------------------------------------------------ */
+
+.modal-font-row {
+    display: flex;
+    align-items: center;
+    padding: 12px 24px;
+    border-bottom: 1px solid #f3f4f6;       /* gray-100 */
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1.3;
+    color: #111827;                          /* gray-900 */
+    transition: background-color 80ms ease;
+    user-select: none;
+}
+.modal-font-row:nth-child(2n) {
+    background-color: #fafafa;
+}
+.modal-font-row:hover {
+    background-color: #eef2ff;               /* indigo-50 */
+}
+.modal-font-row .checkbox {
+    width: 18px;
+    height: 18px;
+    margin-right: 14px;
+    border: 2px solid #9ca3af;               /* gray-400 */
+    border-radius: 3px;
+    flex-shrink: 0;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 80ms ease, border-color 80ms ease;
+}
+.modal-font-row.is-checked .checkbox {
+    background-color: #4f46e5;               /* indigo-600 */
+    border-color: #4f46e5;
+}
+.modal-font-row .checkbox svg {
+    width: 14px;
+    height: 14px;
+    color: #fff;
+    visibility: hidden;
+}
+.modal-font-row.is-checked .checkbox svg {
+    visibility: visible;
+}
+.modal-font-row .name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.modal-font-row .category {
+    flex-shrink: 0;
+    margin-left: 12px;
+    font-size: 11px;
+    font-family: -apple-system, "Segoe UI", sans-serif;
+    color: #6b7280;                          /* gray-500 */
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* "My fonts" sidebar chips */
+.myfont-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #fff;
+    border: 1px solid #e5e7eb;               /* gray-200 */
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+    color: #1f2937;                          /* gray-800 */
+}
+.myfont-chip .label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.myfont-chip button {
+    flex-shrink: 0;
+    margin-left: 8px;
+    color: #9ca3af;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+}
+.myfont-chip button:hover {
+    color: #ef4444;                          /* red-500 */
+    background: #fee2e2;                     /* red-100 */
+}

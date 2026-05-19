@@ -1,0 +1,23 @@
+# Per-job working directories created by the converter at runtime.
+# Each conversion creates tmp/job_xxxx/ which is cleaned up after the
+# PDF is streamed back, but tracking them in git would still cause
+# noise during in-flight conversions.
+tmp/*
+!tmp/.gitkeep
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local environment (contains API keys — keep .env.example tracked instead)
+.env
+.env.local

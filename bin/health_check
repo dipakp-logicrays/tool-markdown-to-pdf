@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+#
+# Markdown → PDF Converter — Health Check
+#
+# Verifies that every runtime dependency is installed and reachable.
+# Exits 0 if everything is OK, 1 if anything failed. Warnings don't
+# fail the script.
+#
+# Usage:
+#   ./bin/health_check
+#   ./bin/health_check --quiet     # only print failures
+
+set -u
+
+QUIET=0
+[ "${1:-}" = "--quiet" ] && QUIET=1
+
+PASS=0
+FAIL=0
+WARN=0
+
+# ANSI colors (disabled if not a TTY)
+if [ -t 1 ]; then
+    GREEN='\033[0;32m'
+    RED='\033[0;31m'
+    YELLOW='\033[0;33m'
+    DIM='\033[2m'
+    RESET='\033[0m'
+else
+    GREEN=''; RED=''; YELLOW=''; DIM=''; RESET=''
+fi
+
+ok()   { [ $QUIET -eq 0 ] && echo -e "  ${GREEN}✓${RESET} $1"; PASS=$((PASS+1)); }
+bad()  { echo -e "  ${RED}✗${RESET} $1"; FAIL=$((FAIL+1)); }
+warn() { [ $QUIET -eq 0 ] && echo -e "  ${YELLOW}!${RESET} $1"; WARN=$((WARN+1)); }
+section() { [ $QUIET -eq 0 ] && echo -e "\n${DIM}— $1${RESET}"; }
+
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+[ $QUIET -eq 0 ] && echo "Markdown → PDF Converter — Health Check"
+[ $QUIET -eq 0 ] && echo -e "${DIM}Project: $PROJECT_DIR${RESET}"
+
+# ---------------------------------------------------------------------
+section "Runtime"
+# ---------------------------------------------------------------------
+
+if command -v php >/dev/null 2>&1; then
+    PHP_VERSION=$(php -r 'echo PHP_VERSION;' 2>/dev/null)
+    ok "PHP available — $PHP_VERSION"
+    if php -r "exit(function_exists('exec') ? 0 : 1);" 2>/dev/null; then
+        ok "PHP exec() is enabled"
+    else
+        bad "PHP exec() is disabled (check disable_functions in php.ini)"
+    fi
+else
+    bad "PHP not found in PATH (install: sudo apt install php-cli)"
+fi
+
+if command -v apache2ctl >/dev/null 2>&1 || command -v httpd >/dev/null 2>&1; then
+    if pgrep -x apache2 >/dev/null 2>&1 || pgrep -x httpd >/dev/null 2>&1; then
+        ok "Apache is running"
+    else
+        warn "Apache binary present but not currently running"
+    fi
+else
+    warn "Apache not detected — PHP built-in server (php -S) works for local testing"
+fi
+
+# ---------------------------------------------------------------------
+section "Conversion tools"
+# ---------------------------------------------------------------------
+
+if command -v pandoc >/dev/null 2>&1; then
+    PANDOC_VERSION=$(pandoc --version 2>/dev/null | head -1)
+    ok "pandoc available — $PANDOC_VERSION"
+else
+    bad "pandoc not found — install: sudo apt install pandoc | brew install pandoc"
+    bad "  guide: https://pandoc.org/installing.html"
+fi
+
+if command -v google-chrome >/dev/null 2>&1; then
+    CHROME_VERSION=$(google-chrome --version 2>&1)
+    ok "Chrome available — $CHROME_VERSION"
+elif command -v chromium >/dev/null 2>&1; then
+    warn "google-chrome not found but chromium is — update CHROME_BIN in includes/config.php"
+elif command -v chromium-browser >/dev/null 2>&1; then
+    warn "google-chrome not found but chromium-browser is — update CHROME_BIN in includes/config.php"
+else
+    bad "google-chrome not found — install: https://www.google.com/chrome/"
+fi
+
+if command -v fc-list >/dev/null 2>&1; then
+    FONT_COUNT=$(fc-list : family 2>/dev/null | awk -F, '{print $1}' | sort -u | wc -l)
+    ok "fc-list available — ${FONT_COUNT} font families installed"
+    if [ "$FONT_COUNT" -lt 20 ]; then
+        warn "Very few fonts installed; consider: sudo apt install fonts-liberation fonts-firacode fonts-noto"
+    fi
+else
+    bad "fc-list not found — install: sudo apt install fontconfig"
+fi
+
+# ---------------------------------------------------------------------
+section "Project state"
+# ---------------------------------------------------------------------
+
+TMP_DIR="$PROJECT_DIR/tmp"
+if [ -d "$TMP_DIR" ]; then
+    if [ -w "$TMP_DIR" ]; then
+        ok "tmp/ exists and is writable by $(whoami)"
+    else
+        bad "tmp/ exists but is not writable by current user ($(whoami)); chmod 0775 tmp/"
+    fi
+else
+    warn "tmp/ does not exist (will be auto-created on first conversion)"
+fi
+
+for f in includes/config.php includes/converter.php includes/google_fonts.php includes/validation.php api/convert.php index.php assets/js/app.js assets/css/app.css assets/data/google_fonts.json; do
+    if [ -f "$PROJECT_DIR/$f" ]; then
+        ok "$f present"
+    else
+        bad "$f missing"
+    fi
+done
+
+# Google Fonts catalog freshness
+CATALOG="$PROJECT_DIR/assets/data/google_fonts.json"
+if [ -f "$CATALOG" ]; then
+    FONT_COUNT_JSON=$(php -r 'echo count(json_decode(file_get_contents("'$CATALOG'"), true));' 2>/dev/null)
+    if [ -n "$FONT_COUNT_JSON" ] && [ "$FONT_COUNT_JSON" -gt 0 ]; then
+        ok "Google Fonts catalog: $FONT_COUNT_JSON families"
+    else
+        bad "Google Fonts catalog is unreadable or empty (run ./bin/refresh_fonts)"
+    fi
+fi
+
+# ---------------------------------------------------------------------
+section "Configuration"
+# ---------------------------------------------------------------------
+
+ENV_FILE="$PROJECT_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+    if grep -qE '^GOOGLE_FONTS_API_KEY=.+' "$ENV_FILE"; then
+        ok ".env present and has GOOGLE_FONTS_API_KEY set"
+    else
+        warn ".env present but GOOGLE_FONTS_API_KEY is empty or missing — ./bin/refresh_fonts will fail until set"
+    fi
+    FONT_SRC=$(grep -E '^FONT_SOURCE=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d ' ')
+    case "${FONT_SRC:-google}" in
+        google|system)
+            ok "FONT_SOURCE=${FONT_SRC:-google} (effective)"
+            ;;
+        *)
+            warn "FONT_SOURCE=${FONT_SRC} is not recognised — will fall back to 'google'"
+            ;;
+    esac
+else
+    warn ".env file missing (copy .env.example to .env and add your API key — only needed to run ./bin/refresh_fonts)"
+fi
+
+# ---------------------------------------------------------------------
+section "Network (Google Fonts)"
+# ---------------------------------------------------------------------
+
+if command -v curl >/dev/null 2>&1; then
+    # Hit a real CSS endpoint, not the root (which 404s by design).
+    HTTP_CODE=$(curl --max-time 5 -sS -o /dev/null -w "%{http_code}" \
+        "https://fonts.googleapis.com/css2?family=Inter&display=swap" 2>/dev/null || echo "000")
+    case "$HTTP_CODE" in
+        2*) ok "fonts.googleapis.com reachable (HTTP $HTTP_CODE) — Google Fonts will work" ;;
+        000) warn "fonts.googleapis.com not reachable — Google Fonts will fall back to system stack" ;;
+        *)  warn "fonts.googleapis.com returned HTTP $HTTP_CODE — Google Fonts may fall back" ;;
+    esac
+else
+    warn "curl not installed — cannot verify fonts.googleapis.com reachability"
+fi
+
+# ---------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------
+
+[ $QUIET -eq 0 ] && echo
+[ $QUIET -eq 0 ] && echo "————————————————————————————————————————"
+
+if [ "$FAIL" -eq 0 ]; then
+    echo -e "${GREEN}OK${RESET} — ${PASS} checks passed, ${WARN} warnings, 0 failures."
+    exit 0
+else
+    echo -e "${RED}FAIL${RESET} — ${PASS} passed, ${WARN} warnings, ${RED}${FAIL} failures${RESET}."
+    exit 1
+fi
