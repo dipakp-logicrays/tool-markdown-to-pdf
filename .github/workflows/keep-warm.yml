@@ -1,0 +1,50 @@
+name: Keep Render service warm
+
+# Free Web Services on Render.com spin down after 15 minutes of
+# inactivity, causing a 30-60s cold start on the next request. This
+# workflow pings the deployed URL every 5 minutes so the service
+# never gets a chance to sleep.
+#
+# Cost: free. Public repos get unlimited GitHub Actions minutes; each
+# ping uses ~2 seconds of compute. ~4,300 pings/month at ~2 seconds
+# each ≈ 2.4 hours/month total. Well within the 2,000 min/month free
+# allowance for private repos too.
+#
+# Caveats:
+# - Keeping the service awake 24/7 consumes ~720-744 hrs of Render's
+#   750 hrs/month free compute quota. If you also run other free
+#   Render services or hit the bandwidth cap (100 GB/mo), the service
+#   will pause for the rest of the billing cycle.
+# - GitHub Actions cron schedules can be delayed by 5-15 min under
+#   load. A 5-min interval gives enough margin that even delayed runs
+#   usually land before Render's 15-min idle threshold.
+# - To override the URL, set a repository VARIABLE named RENDER_URL
+#   under Settings → Secrets and variables → Actions → Variables tab.
+#   (It's a URL, not a secret — but Variables is the right place to
+#   keep it editable without touching the workflow file.)
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # allows manual trigger from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping deployed service
+        run: |
+          URL="${{ vars.RENDER_URL || 'https://md-to-pdf-converter-bgt2.onrender.com' }}"
+          echo "Pinging: $URL"
+          # --fail returns non-zero on HTTP >= 400 so a broken deploy
+          # shows up as a failed workflow run.
+          # --max-time 90 covers Render's worst-case cold start (60s)
+          # plus our app's startup (Apache + PHP).
+          curl --fail --silent --show-error --max-time 90 \
+               --output /dev/null \
+               --write-out "HTTP %{http_code} | %{time_total}s | %{size_download} bytes\n" \
+               "$URL"
