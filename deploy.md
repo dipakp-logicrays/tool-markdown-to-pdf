@@ -216,6 +216,35 @@ RAM, and response time.
 | **Auto-sleep when idle** | **After 15 min of no requests** |
 | **Cold-start time** | **30–60 seconds on the next request after sleep** |
 
+### Keeping the service warm — avoid the cold-start delay
+
+A GitHub Actions workflow at
+[`.github/workflows/keep-warm.yml`](.github/workflows/keep-warm.yml)
+pings the deployed URL every 5 minutes so Render never reaches the
+15-minute idle window that triggers spin-down. Result: no 30-60s cold
+start on the first request after a quiet period.
+
+It activates automatically once the file is on `main` — the first run
+fires on the next cron tick (within ~5 min) or you can trigger it
+manually from the **Actions** tab → "Keep Render service warm" →
+**Run workflow**.
+
+**If your service URL is different** from the fallback baked into the
+workflow, override it without editing the YAML:
+
+1. GitHub repo → **Settings** → **Secrets and variables** → **Actions**
+2. **Variables** tab → **New repository variable**
+3. Name: `RENDER_URL`, Value: your service URL (e.g.
+   `https://md-to-pdf-converter-xyz.onrender.com`)
+4. Save. Next scheduled run picks it up.
+
+**Trade-off to be aware of:** keeping the service awake 24/7 burns
+roughly **720–744 hrs/month** of Render's **750 hrs free compute**
+quota — fine for one service, but if you also run other free Render
+services in the same workspace the totals add up and the service may
+pause when quota runs out. For high-traffic / production-style use,
+the **Starter plan ($7/mo)** removes the quota and the sleep entirely.
+
 ### Auto-sleep — what it means in practice
 
 Your service shuts down after 15 minutes of no traffic. The next visitor
